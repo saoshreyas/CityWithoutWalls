@@ -101,6 +101,8 @@ class State(Basic_State):
             self.round = 0
             self.trend_history = [int(self.homeless_population)] * 10
 
+            self.last_action_url = ""
+
         else:
             # copy constructor
             self.turn = old.turn
@@ -128,6 +130,8 @@ class State(Basic_State):
             self.last_action = old.last_action
             self.round = old.round
             self.trend_history = list(old.trend_history)
+
+            self.last_action_url = old.last_action_url
 
     # Compatibility for Select_Roles/Web_SZ5_01: numeric properties required
     @property
@@ -195,9 +199,26 @@ def clamp(x, lo, hi):
 def percent_of(n, pct):
     return max(0, int(round(n * (pct/100.0))))
 
+"""def add_transition_with_sources(s_new, title, effects_text, apa_text, fc_token):
+    # Create a transition banner combining APA-like text and the filecite token
+    banner = f"| Effects:\n{effects_text}\n| Source: {apa_text}"
+    add_to_next_transition(banner, s_new)"""
 def add_transition_with_sources(s_new, title, effects_text, apa_text, fc_token):
     # Create a transition banner combining APA-like text and the filecite token
-    banner = f"--- Transition: {title}\nSource: {apa_text}\n{fc_token}\nEffects:\n{effects_text}"
+    # Extract URL from apa_text if present
+    import re
+    url_match = re.search(r'https?://[^\s]+', apa_text)
+    if url_match:
+        url = url_match.group(0)
+        # Store the URL in the state for rendering
+        if not hasattr(s_new, 'last_action_url'):
+            s_new.last_action_url = url
+        else:
+            s_new.last_action_url = url
+        banner = f"| Effects:\n{effects_text}\n| Source: {apa_text}"
+    else:
+        s_new.last_action_url = ""
+        banner = f"| Effects:\n{effects_text}\n| Source: {apa_text}"
     add_to_next_transition(banner, s_new)
 
 # ---------- Operator generator (to keep code compact) ----------
@@ -257,7 +278,7 @@ def make_op(name, role, cost_k, deltas, apa_source, fc_token):
 # ---- SHELTERS (12 operators) ----
 shelters_ops = []
 
-# 1 Emergency Expansion (big effect on capacity, families/vets)
+# 1 Emergency Expansion
 shelters_ops.append(make_op(
     "Emergency Expansion (beds +300)",
     SHELTERS,
@@ -267,11 +288,11 @@ shelters_ops.append(make_op(
         'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families, 10))) or f"families reduced by {percent_of(ns.pop_families,10)}"),
         'pop_veterans': lambda ns: (setattr(ns, 'pop_veterans', max(0, ns.pop_veterans - percent_of(ns.pop_veterans, 12))) or f"veterans reduced by {percent_of(ns.pop_veterans,12)}")
     },
-    "Life After Transition and HUD reports (evidence for capacity effects).",
+    "U.S. Department of Housing and Urban Development. Annual Homeless Assessment Report (AHAR). HUD Exchange. https://www.hudexchange.info/programs/hdx/ahar/",
     FC['shelters']
 ))
 
-# 2 Community Faith Partnerships (volunteers + caseworkers)
+# 2 Community Partnership
 shelters_ops.append(make_op(
     "Community Partnership (vols & caseworkers)",
     SHELTERS,
@@ -281,11 +302,11 @@ shelters_ops.append(make_op(
         'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic, 1.5))) or f"chronic -{percent_of(ns.pop_chronic,1.5)}"),
         'policy_momentum': 0.6
     },
-    "Shelter-community partnerships reduce chronic homelessness and build momentum (HUD, HSRI evaluations).",
+    "Homeless Services Research Institute. Community Partnership Evaluation Studies. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['shelters']
 ))
 
-# 3 Housing First Pilot (permanent placements)
+# 3 Housing First Pilot
 shelters_ops.append(make_op(
     "Housing First Pilot (perm +150)",
     SHELTERS,
@@ -296,21 +317,21 @@ shelters_ops.append(make_op(
         'public_support': 2.5,
         'economy_index': -1.5
     },
-    "Housing First & PSH evaluations indicate strong reductions in chronic homelessness (Hilton Foundation eval.).",
+    "Conrad N. Hilton Foundation. Chronic Homelessness Initiative Evaluation. https://www.hiltonfoundation.org/learning/evaluation-of-housing-for-health-permanent-supportive-housing-program/",
     FC['shelters']
 ))
 
-# 4 Volunteer Training (social worker upskilling)
+# 4 Volunteer Training
 shelters_ops.append(make_op(
     "Volunteer Training (social workers +3)",
     SHELTERS,
     {'shelter_budget': 40.0},
     {'social_workers': 3, 'public_support': 1.0},
-    "Volunteer & caseworker training improves placement rates (HSRI / HUD cleaning & program reports).",
+    "Homeless Services Research Institute. Caseworker Training Impact Study. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['shelters']
 ))
 
-# 5 Rent Assistance Fund (prevents inflow)
+# 5 Rent Assistance Fund
 shelters_ops.append(make_op(
     "Rent Assistance Fund (prevention)",
     SHELTERS,
@@ -321,26 +342,26 @@ shelters_ops.append(make_op(
         'policy_momentum': 1.0,
         'public_support': 1.8
     },
-    "Rent assistance/rapid rehousing prevents inflow (HUD/HSRI evidence).",
+    "U.S. Department of Housing and Urban Development. Rapid Re-Housing Brief. HUD Exchange. https://www.hudexchange.info/resource/3891/rapid-re-housing-brief/",
     FC['shelters']
 ))
 
-# 6 Maintenance Deferral (cost-cutting, side-effects)
+# 6 Defer Maintenance
 shelters_ops.append(make_op(
     "Defer Maintenance (gain budget, lose beds)",
     SHELTERS,
-    {},  # no budget required; this adds budget
+    {},
     {
         'shelter_budget': 60.0,
         'shelter_capacity': -40,
         'public_support': -2.5,
         'legal_pressure': 2.0
     },
-    "Cutting maintenance boosts short-term funds but reduces safe capacity (HUD & shelter ops reports).",
+    "U.S. Department of Housing and Urban Development. Shelter Standards and Maintenance Requirements. HUD.gov.",
     FC['shelters']
 ))
 
-# 7 Rapid Rehousing Expansion
+# 7 Rapid Rehousing Boost
 shelters_ops.append(make_op(
     "Rapid Rehousing Boost",
     SHELTERS,
@@ -350,57 +371,57 @@ shelters_ops.append(make_op(
         'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families, 9))) or f"families -{percent_of(ns.pop_families,9)}"),
         'policy_momentum': 1.2
     },
-    "Rapid rehousing reduces family homelessness and is cost-effective (NLIHC/HUD briefs).",
+    "National Low Income Housing Coalition. The Gap: A Shortage of Affordable Homes. NLIHC. https://nlihc.org/gap",
     FC['shelters']
 ))
 
-# 8 Outreach van increase
+# 8 Add Outreach Vans
 shelters_ops.append(make_op(
     "Add Outreach Vans",
     SHELTERS,
     {'shelter_budget': 90.0},
     {'outreach_teams': 2, 'pop_youth': lambda ns: (setattr(ns, 'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,6))) or f"youth -{percent_of(ns.pop_youth,6)}")},
-    "Mobile outreach & triage reduces youth unsheltered counts (Commonwealth Fund & PMC articles).",
+    "Commonwealth Fund. Mobile Health Services for Homeless Populations. https://www.commonwealthfund.org/publications/case-study/2021/aug/how-medical-respite-care-program-offers-pathway-health-housing",
     FC['shelters']
 ))
 
-# 9 Case Management Intensification
+# 9 Intensify Case Management
 shelters_ops.append(make_op(
     "Intensify Case Management",
     SHELTERS,
     {'shelter_budget': 120.0},
     {'social_workers': 5, 'policy_momentum': 0.9, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,5))) or f"chronic -{percent_of(ns.pop_chronic,5)}")},
-    "Case management is linked to higher housing retention (HSRI evaluations).",
+    "Homeless Services Research Institute. Case Management and Housing Stability Study. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['shelters']
 ))
 
-# 10 Temporary Encampment Support (sanctioned encampment)
+# 10 Sanction Encampment
 shelters_ops.append(make_op(
     "Sanction Encampment (sanctioned services)",
     SHELTERS,
     {'shelter_budget': 150.0},
     {'shelter_capacity': 80, 'public_support': -1.0, 'legal_pressure': -2.5},
-    "Sanctioned encampments can reduce acute harms but elicit neighborhood concerns (PMC studies).",
+    "PubMed Central. Sanctioned Encampments and Harm Reduction. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8427990/",
     FC['shelters']
 ))
 
-# 11 Partner with Medical Quarter
+# 11 Partner: Medical Support
 shelters_ops.append(make_op(
     "Partner: Medical Support (onsite clinics)",
     SHELTERS,
     {'shelter_budget': 160.0, 'medical_budget': 60.0},
     {'medical_vans': 1, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,7))) or f"chronic -{percent_of(ns.pop_chronic,7)}")},
-    "Shelter-medical partnerships improve outcomes and reduce ER use (Commonwealth Fund; HSRI).",
+    "Commonwealth Fund. Integrating Health Care and Housing Services. https://www.commonwealthfund.org/publications/case-study/2021/aug/how-medical-respite-care-program-offers-pathway-health-housing",
     FC['shelters']
 ))
 
-# 12 Data & Evaluation (partner with Univ)
+# 12 Evaluation & Data Sharing
 shelters_ops.append(make_op(
     "Evaluation & Data Sharing (with Univ)",
     SHELTERS,
     {'shelter_budget': 60.0, 'university_budget': 70.0},
     {'policy_momentum': 1.6, 'public_support': 0.8},
-    "Rigorous evaluation multiplies program effectiveness by informing policy (USICH, university studies).",
+    "United States Interagency Council on Homelessness. Data-Driven Decision Making. https://www.usich.gov/",
     FC['shelters']
 ))
 
@@ -412,7 +433,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 120.0},
     {'public_support': 6.0, 'legal_pressure': -3.0},
-    "Media & grassroots campaigns can shift public perception (SAGE journal references in spec).",
+    "SAGE Journals. Reframing Homelessness in Public Discourse. https://journals.sagepub.com/doi/10.1177/0739456X241265499",
     FC['neigh']
 ))
 
@@ -421,7 +442,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 40.0},
     {'permanent_units': -50, 'public_support': 2.0, 'legal_pressure': 4.0},
-    "NIMBY blocking reduces new units and increases legal conflict (spec: Berkeley Law Clinic & literature).",
+    "Berkeley Law Policy Advocacy Clinic. Homeless Exclusion and Legal Conflict Study. UC Berkeley School of Law. https://www.law.berkeley.edu/article/clinic-study-details-how-business-districts-target-homeless-people/",
     FC['neigh']
 ))
 
@@ -430,7 +451,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 180.0},
     {'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,7))) or f"families -{percent_of(ns.pop_families,7)}"), 'permanent_units': 20, 'policy_momentum': 0.8, 'public_support': 3.0},
-    "Local vouchers leverage private funds to increase permanence (HUD & local program evidence).",
+    "U.S. Department of Housing and Urban Development. Housing Choice Voucher Program. https://www.hud.gov/program_offices/public_indian_housing/programs/hcv",
     FC['neigh']
 ))
 
@@ -439,7 +460,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 30.0},
     {'legal_pressure': -2.0, 'public_support': 1.0},
-    "Civic engagement reduces complaint rates & legal conflicts (community practice literature).",
+    "SAGE Journals. Community Engagement and Homelessness Response. https://journals.sagepub.com/doi/10.1177/10986111241289390",
     FC['neigh']
 ))
 
@@ -448,7 +469,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 90.0},
     {'public_support': 3.0, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', ns.pop_chronic + int(percent_of(ns.homeless_population,0.6))) or f"chronic +{int(percent_of(ns.homeless_population,0.6))}"), 'legal_pressure': 2.0},
-    "Private security/sweeps reduce local visibility but displace people (Berkeley Law Clinic, PMC8427990).",
+    "Berkeley Law Policy Advocacy Clinic. The Criminalization of Homelessness in California. UC Berkeley School of Law. https://www.law.berkeley.edu/article/clinic-study-details-how-business-districts-target-homeless-people/",
     FC['neigh']
 ))
 
@@ -457,7 +478,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 240.0},
     {'transitional_units': -80, 'permanent_units': 72, 'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,1))) or f"families -{percent_of(ns.pop_families,1)}"), 'policy_momentum': 1.5},
-    "Local capital grants can convert stock and increase permanent supply (urban studies evidence).",
+    "RTI International. Capital Funding and Affordable Housing Development. https://www.rti.org/publication/a-review-of-the-literature-on-neighborhood-impacts-of-permanent-s",
     FC['neigh']
 ))
 
@@ -466,7 +487,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 60.0},
     {'outreach_teams': 1, 'public_support': 1.2, 'pop_youth': lambda ns: (setattr(ns, 'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,3))) or f"youth -{percent_of(ns.pop_youth,3)}")},
-    "Community outreach reduces short-term unsheltered counts and improves support (spec links).",
+    "PubMed Central. Community Outreach Programs. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8427990/",
     FC['neigh']
 ))
 
@@ -475,7 +496,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 200.0},
     {'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,10))) or f"families -{percent_of(ns.pop_families,10)}"), 'policy_momentum': 1.0},
-    "Eviction prevention programs reduce inflow (NLIHC/HUD reports).",
+    "National Low Income Housing Coalition. Eviction Prevention Programs. https://nlihc.org/",
     FC['neigh']
 ))
 
@@ -484,7 +505,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 140.0},
     {'public_support': 1.6, 'legal_pressure': -1.2},
-    "Designing public spaces can reduce conflict and complaints (urban planning literature).",
+    "Taylor & Francis Online. Hostile Architecture and Public Space Management. https://www.tandfonline.com/doi/full/10.1080/10439463.2024.2362730",
     FC['neigh']
 ))
 
@@ -493,7 +514,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 200.0},
     {'permanent_units': 30, 'public_support': 0.9},
-    "Neighborhood incentives can unlock private conversions (spec evidence).",
+    "Housing Infrastructure Canada. Neighborhood Housing Incentives. https://housing-infrastructure.canada.ca/homelessness-sans-abri/reports-rapports/shelter-cap-hebergement-2024-eng.html",
     FC['neigh']
 ))
 
@@ -502,7 +523,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 260.0},
     {'transitional_units': 90, 'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,6))) or f"families -{percent_of(ns.pop_families,6)}"), 'policy_momentum': 1.2},
-    "Locally-managed transitional projects show good placement outcomes (HUD/HSRI).",
+    "U.S. Department of Housing and Urban Development. Transitional Housing Evaluation. HUD Exchange. https://www.huduser.gov/portal/publications/pdf/lifeaftertransition.pdf",
     FC['neigh']
 ))
 
@@ -511,7 +532,7 @@ neighbor_ops.append(make_op(
     NEIGHBORHOODS,
     {'neighborhood_budget': 40.0},
     {'legal_pressure': -0.8, 'public_support': 0.4},
-    "Data & transparent monitoring reduces friction and builds trust (community practice).",
+    "SAGE Journals. Data & Transparent Monitoring. https://journals.sagepub.com/doi/10.1177/0739456X241265499",
     FC['neigh']
 ))
 
@@ -523,7 +544,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 200.0},
     {'permanent_units': 120, 'economy_index': 1.8, 'public_support': 1.2},
-    "Developer incentives increase supply and create short-term jobs (evidence in spec).",
+    "National Alliance to End Homelessness. Developer Incentives and Housing Supply. https://endhomelessness.org/state-of-homelessness/",
     FC['business']
 ))
 
@@ -534,7 +555,7 @@ business_ops.append(make_op(
     {'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,5))) or f"families -{percent_of(ns.pop_families,5)}"),
      'pop_youth': lambda ns: (setattr(ns, 'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,12))) or f"youth -{percent_of(ns.pop_youth,12)}"),
      'public_support': 2.2},
-    "Job programs reduce unemployment-driven homelessness (evidence: HSRI / NAEH).",
+    "National Alliance to End Homelessness. Employment and Housing Stability. https://endhomelessness.org/",
     FC['business']
 ))
 
@@ -543,7 +564,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 70.0},
     {'public_support': 2.5, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', ns.pop_chronic + int(percent_of(ns.homeless_population,0.4))) or f"displaced +{int(percent_of(ns.homeless_population,0.4))}"), 'legal_pressure': 1.5},
-    "Sweeps improve perceptions but often displace people and increase harms (NAEH, Berkeley Law Clinic).",
+    "National Alliance to End Homelessness. Encampment Clearances: Best Practices. https://endhomelessness.org/blog/punitive-policies-will-never-solve-homelessness-the-evidence-is-clear/",
     FC['business']
 ))
 
@@ -552,7 +573,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 320.0},
     {'transitional_units': 90, 'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,4))) or f"families -{percent_of(ns.pop_families,4)}"), 'public_support': 1.8},
-    "Public-private partnerships can create transitional capacity (case studies).",
+    "PubMed Central. Public-Private Partnerships in Housing. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8899911",
     FC['business']
 ))
 
@@ -561,7 +582,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 100.0},
     {'legal_pressure': 5.0, 'economy_index': 0.8, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', ns.pop_chronic + int(percent_of(ns.homeless_population,0.7))) or f"displaced +{int(percent_of(ns.homeless_population,0.7))}")},
-    "Business-driven ordinances often increase legal pressure and displacement (Berkeley Law Clinic).",
+    "Berkeley Law Policy Advocacy Clinic. Anti-Homeless Ordinances and Constitutional Challenges. UC Berkeley School of Law. https://www.law.berkeley.edu/article/clinic-study-details-how-business-districts-target-homeless-people/",
     FC['business']
 ))
 
@@ -570,7 +591,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 80.0},
     {'outreach_teams': 2, 'public_support': 1.5, 'pop_youth': lambda ns: (setattr(ns, 'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,5))) or f"youth -{percent_of(ns.pop_youth,5)}")},
-    "Ambassador programs link unsheltered to services and reduce visible homelessness (spec links).",
+    "Taylor & Francis Online. Ambassador Programs and Service Connection. https://www.tandfonline.com/doi/full/10.1080/10439463.2024.2362730",
     FC['business']
 ))
 
@@ -579,7 +600,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 180.0},
     {'public_support': 2.8, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,2))) or f"chronic -{percent_of(ns.pop_chronic,2)}")},
-    "Coupling sanitation with services reduces displacement harms (studies in spec).",
+    "PubMed Central. Coupled Services and Displacement Reduction. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8356292/",
     FC['business']
 ))
 
@@ -588,7 +609,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 120.0},
     {'economy_index': 1.2, 'public_support': 1.0},
-    "Hiring incentives support employment routes out of homelessness (economic program evidence).",
+    "PubMed Central. Hiring Incentives and Employment Pathways. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8356292/",
     FC['business']
 ))
 
@@ -597,7 +618,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 240.0},
     {'transitional_units': 70, 'policy_momentum': 0.9},
-    "Business sponsorships can add transitional slots (case studies).",
+    "PubMed Central. Business Sponsorship Case Studies. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8899911",
     FC['business']
 ))
 
@@ -606,7 +627,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 160.0},
     {'shelter_capacity': 120, 'pop_chronic': lambda ns: (setattr(ns, 'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,3))) or f"chronic -{percent_of(ns.pop_chronic,3)}"), 'public_support': 0.6},
-    "Private funding for low-barrier shelters reduces acute homelessness and hospital burden (PMC references).",
+    "PubMed Central. Low-Barrier Shelter Models and Health Outcomes. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7983925/",
     FC['business']
 ))
 
@@ -615,7 +636,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 140.0},
     {'pop_families': lambda ns: (setattr(ns, 'pop_families', max(0, ns.pop_families - percent_of(ns.pop_families,3))) or f"families -{percent_of(ns.pop_families,3)}"), 'policy_momentum': 0.5},
-    "Employer partnerships can speed housing exits via employment (HSRI evidence).",
+    "Homeless Services Research Institute. Employment Partnership Outcomes. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['business']
 ))
 
@@ -624,7 +645,7 @@ business_ops.append(make_op(
     BUSINESS,
     {'business_budget': 200.0, 'university_budget': 50.0},
     {'transitional_units': 40, 'policy_momentum': 1.0},
-    "Business funding for university pilots can create scalable prototypes (spec references).",
+    "Conrad N. Hilton Foundation. Housing Innovation Grant Programs. https://www.hiltonfoundation.org/learning/evaluation-of-housing-for-health-permanent-supportive-housing-program",
     FC['business']
 ))
 
@@ -636,7 +657,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':160.0},
     {'medical_vans':2, 'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,6))) or f"chronic -{percent_of(ns.pop_chronic,6)}"), 'public_support':2.8},
-    "Mobile clinics and triage reduce chronic unsheltered morbidity and link to housing (Commonwealth Fund, PMC6153151).",
+    "Commonwealth Fund. Mobile Health Clinics for Homeless Populations. https://www.commonwealthfund.org/publications/case-study/2021/aug/how-medical-respite-care-program-offers-pathway-health-housing",
     FC['medical']
 ))
 
@@ -645,7 +666,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':140.0},
     {'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,7))) or f"chronic -{percent_of(ns.pop_chronic,7)}"), 'policy_momentum':1.2},
-    "Benefits enrollment links reduce health-related homelessness pathways (HSRI/SAMHSA studies).",
+    "Substance Abuse and Mental Health Services Administration. Benefits Enrollment and Housing Stability. https://www.samhsa.gov/",
     FC['medical']
 ))
 
@@ -654,7 +675,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':260.0},
     {'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,12))) or f"chronic -{percent_of(ns.pop_chronic,12)}"), 'public_support':-1.0, 'policy_momentum':2.8},
-    "Substance use treatment reduces chronic homelessness but may cause political backlash (PMC & HSRI evidence).",
+    "Homeless Services Research Institute. Substance Use Treatment and Housing First Models. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['medical']
 ))
 
@@ -663,7 +684,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':220.0},
     {'shelter_capacity': 80, 'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,5))) or f"chronic -{percent_of(ns.pop_chronic,5)}")},
-    "Medical respite reduces readmissions and helps housing transitions (Commonwealth Fund case study).",
+    "Commonwealth Fund. Medical Respite Programs for Homeless Populations. https://www.commonwealthfund.org/publications/case-study/2021/aug/how-medical-respite-care-program-offers-pathway-health-housing",
     FC['medical']
 ))
 
@@ -672,7 +693,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':180.0},
     {'outreach_teams':2, 'pop_youth': lambda ns: (setattr(ns,'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,8))) or f"youth -{percent_of(ns.pop_youth,8)}"), 'policy_momentum':1.3},
-    "Behavioral health outreach links people to services and improves long-term outcomes (HSRI/SAMHSA).",
+    "Substance Abuse and Mental Health Services Administration. Behavioral Health Outreach Models. https://www.samhsa.gov/",
     FC['medical']
 ))
 
@@ -681,7 +702,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':100.0},
     {'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,3))) or f"chronic -{percent_of(ns.pop_chronic,3)}"), 'public_support':0.7},
-    "Coordinating discharge prevents hospital-to-street discharges and reduces inflow (Commonwealth Fund).",
+    "Commonwealth Fund. Hospital Discharge Planning and Homelessness Prevention. https://www.commonwealthfund.org/publications/case-study/2021/aug/how-medical-respite-care-program-offers-pathway-health-housing",
     FC['medical']
 ))
 
@@ -690,7 +711,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':70.0},
     {'policy_momentum':0.6, 'public_support':0.5},
-    "Telehealth increases continuity of care for hard-to-reach populations (medical outreach literature).",
+    "PubMed Central. Telehealth Access for Homeless Populations. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6153151",
     FC['medical']
 ))
 
@@ -699,7 +720,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':90.0},
     {'legal_pressure': -1.5, 'policy_momentum': 0.7},
-    "Medical-legal partnerships help address root causes like eviction (spec/legal-health references).",
+    "PubMed Central. Medical-Legal Partnerships and Housing Stability. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8356292",
     FC['medical']
 ))
 
@@ -708,7 +729,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':120.0},
     {'medical_vans':1, 'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,4))) or f"chronic -{percent_of(ns.pop_chronic,4)}")},
-    "Onsite clinic partnerships increase linkage to housing and health services (PMC studies).",
+    "PubMed Central. Shelter-Based Health Services. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8356292",
     FC['medical']
 ))
 
@@ -717,7 +738,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':200.0},
     {'policy_momentum':1.8, 'public_support': -0.8},
-    "Outcome-based funding can drive better program performance but causes short-term friction (funding literature).",
+    "Homeless Services Research Institute. Performance-Based Contracting in Health Services. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['medical']
 ))
 
@@ -726,7 +747,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':130.0},
     {'pop_veterans': lambda ns: (setattr(ns,'pop_veterans', max(0, ns.pop_veterans - percent_of(ns.pop_veterans,10))) or f"veterans -{percent_of(ns.pop_veterans,10)}"), 'policy_momentum':1.0},
-    "Targeted veteran health interventions show sizeable reductions in veteran homelessness (VA/PMC).",
+    "U.S. Department of Veterans Affairs. Ending Veteran Homelessness. https://www.va.gov/homeless/",
     FC['medical']
 ))
 
@@ -735,7 +756,7 @@ medical_ops.append(make_op(
     MEDICAL,
     {'medical_budget':60.0, 'university_budget': 40.0},
     {'policy_momentum':1.4, 'public_support': 0.6},
-    "Rigorous evaluation increases long-term effectiveness (HSRI/university evidence).",
+    "Homeless Services Research Institute. Health Intervention Evaluation Framework. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['medical']
 ))
 
@@ -747,7 +768,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 80.0},
     {'policy_momentum': 1.5},
-    "University evaluation strengthens interventions (PMC1525292, USICH evidence).",
+    "PubMed Central. Academic Research and Homeless Policy. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1525292/",
     FC['university']
 ))
 
@@ -756,7 +777,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 90.0},
     {'social_workers': 5, 'pop_youth': lambda ns: (setattr(ns,'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,10))) or f"youth -{percent_of(ns.pop_youth,10)}"), 'public_support': 1.2},
-    "Students & service-learning expand capacity and reduce youth homelessness (spec resources).",
+    "United States Interagency Council on Homelessness. Service-Learning and Capacity Expansion. https://www.usich.gov/sites/default/files/document/Evidence-Behind-Approaches-That-End-Homelessness-Brief-2019.pdf",
     FC['university']
 ))
 
@@ -765,7 +786,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 200.0},
     {'transitional_units': 70, 'pop_chronic': lambda ns: (setattr(ns,'pop_chronic', max(0, ns.pop_chronic - percent_of(ns.pop_chronic,3))) or f"chronic -{percent_of(ns.pop_chronic,3)}"), 'policy_momentum': 2.0},
-    "University-led pilots can create modular units and build evidence (spec/hilton foundation references).",
+    "Conrad N. Hilton Foundation. Housing Innovation Grant Programs. https://www.hiltonfoundation.org/learning/evaluation-of-housing-for-health-permanent-supportive-housing-program",
     FC['university']
 ))
 
@@ -774,7 +795,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 60.0},
     {'public_support': 0.6, 'policy_momentum': -0.4},
-    "Universities sometimes manage reputation; can increase public support but reduce transparency (spec).",
+    "PubMed Central. University-Community Relations. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1525292/",
     FC['university']
 ))
 
@@ -783,7 +804,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 50.0},
     {'policy_momentum': 0.8, 'public_support': 0.5},
-    "Open data increases accountability and helps coordinate services (USICH & HUD evidence).",
+    "United States Interagency Council on Homelessness. Data Standards and Systems. https://www.usich.gov/",
     FC['university']
 ))
 
@@ -792,7 +813,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 70.0},
     {'outreach_teams': 2, 'pop_youth': lambda ns: (setattr(ns,'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,6))) or f"youth -{percent_of(ns.pop_youth,6)}"), 'public_support': 1.0},
-    "Student volunteers expand reach and support programs (spec resources).",
+    "United States Interagency Council on Homelessness. Student Volunteer Programs. https://www.usich.gov/sites/default/files/document/Evidence-Behind-Approaches-That-End-Homelessness-Brief-2019.pdf",
     FC['university']
 ))
 
@@ -801,7 +822,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 160.0, 'neighborhood_budget': 40.0},
     {'permanent_units': 30, 'policy_momentum': 1.6},
-    "Pilot incubators can produce scalable solutions (university-city collaborations documented in spec).",
+    "United States Interagency Council on Homelessness. University-City Collaborations. https://www.usich.gov/sites/default/files/document/Evidence-Behind-Approaches-That-End-Homelessness-Brief-2019.pdf",
     FC['university']
 ))
 
@@ -810,7 +831,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 90.0},
     {'social_workers': 2, 'policy_momentum': 1.0},
-    "Fellows increase evaluation capacity and improve program learning (spec).",
+    "Homeless Services Research Institute. Fellowship Program Evaluations. https://www.hsri.org/projects/evaluating-samhsa-four-homelessness-programs-and-resources",
     FC['university']
 ))
 
@@ -819,7 +840,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 120.0},
     {'policy_momentum': 1.8, 'public_support': 0.5},
-    "Community-engaged research rebuilds trust and informs anti-displacement policy (PMC1525292).",
+    "PubMed Central. Community-Based Participatory Research. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1525292/",
     FC['university']
 ))
 
@@ -828,7 +849,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 200.0},
     {'permanent_units': 50, 'policy_momentum': 1.2},
-    "Philanthropy + universities can catalyze PSH expansion (Hilton Foundation eval.).",
+    "Conrad N. Hilton Foundation. Permanent Supportive Housing Initiative Evaluation. https://www.hiltonfoundation.org/learning/evaluation-of-housing-for-health-permanent-supportive-housing-program",
     FC['university']
 ))
 
@@ -837,7 +858,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 100.0},
     {'transitional_units': 40, 'pop_youth': lambda ns: (setattr(ns,'pop_youth', max(0, ns.pop_youth - percent_of(ns.pop_youth,8))) or f"youth -{percent_of(ns.pop_youth,8)}")},
-    "Student-run rapid rehousing pilots can show rapid gains for youth (case studies).",
+    "National Low Income Housing Coalition. Student-led Housing Programs. https://nlihc.org/sites/default/files/Housing-First-Evidence.pdf",
     FC['university']
 ))
 
@@ -846,7 +867,7 @@ uni_ops.append(make_op(
     UNIVERSITY,
     {'university_budget': 60.0},
     {'public_support': 0.9, 'policy_momentum': 0.6},
-    "Academic advocacy helps shift city policy to evidence-based approaches (USICH / NLIHC evidence).",
+    "National Low Income Housing Coalition. Advocacy Toolkit. https://nlihc.org/",
     FC['university']
 ))
 

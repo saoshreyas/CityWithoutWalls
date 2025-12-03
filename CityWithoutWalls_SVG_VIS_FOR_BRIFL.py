@@ -91,14 +91,20 @@ def render_state(s, roles=None):
     km_y = panel_y + 140
     spacing = 18
     dwg.add(dwg.text(f"Round: {s.round}", insert=(panel_x + 12, km_y), font_size=SM_FS))
-    dwg.add(dwg.text(f"Total Homeless: {s.homeless_population}", insert=(panel_x + 12, km_y + spacing), font_size=SM_FS))
-    dwg.add(dwg.text(f"Shelter cap: {s.shelter_capacity}", insert=(panel_x + 12, km_y + 2*spacing), font_size=SM_FS))
-    dwg.add(dwg.text(f"Transitional: {s.transitional_units}", insert=(panel_x + 12, km_y + 3*spacing), font_size=SM_FS))
-    dwg.add(dwg.text(f"Permanent units: {s.permanent_units}", insert=(panel_x + 12, km_y + 4*spacing), font_size=SM_FS))
+    dwg.add(dwg.text(f"Shelter cap: {s.shelter_capacity}", insert=(panel_x + 12, km_y + spacing), font_size=SM_FS))
+    dwg.add(dwg.text(f"Transitional: {s.transitional_units}", insert=(panel_x + 12, km_y + 2*spacing), font_size=SM_FS))
+    dwg.add(dwg.text(f"Permanent units: {s.permanent_units}", insert=(panel_x + 12, km_y + 3*spacing), font_size=SM_FS))
 
     # Debt & momentum mini
-    dwg.add(dwg.text(f"Debt (k$): {s.debt:.0f}", insert=(panel_x + 12, panel_y + panel_h - 40), font_size=SM_FS))
-    dwg.add(dwg.text(f"Policy momentum: {s.policy_momentum:.1f}", insert=(panel_x + 12, panel_y + panel_h - 22), font_size=SM_FS))
+    dwg.add(dwg.text(f"Debt (k$): {s.debt:.0f}", insert=(panel_x + 12, panel_y + panel_h - 60), font_size=SM_FS))
+    dwg.add(dwg.text(f"Policy momentum: {s.policy_momentum:.1f}", insert=(panel_x + 12, panel_y + panel_h - 42), font_size=SM_FS))
+
+    # Source citation at bottom of panel
+    if hasattr(s, 'last_action_url') and s.last_action_url:
+        link = dwg.add(dwg.a(href=s.last_action_url, target="_blank"))
+        link.add(dwg.text("📖 View Source", insert=(panel_x + 12, panel_y + panel_h - 12), 
+                         font_size=SM_FS, fill="#0066cc", 
+                         style="text-decoration:underline;cursor:pointer;"))
 
     # -------- MIDDLE PANEL: Population Breakdown & Trend --------
     mp_x = mid_col_x
@@ -107,6 +113,9 @@ def render_state(s, roles=None):
     mp_h = 300
     dwg.add(dwg.rect((mp_x, mp_y), (mp_w, mp_h), fill="#ffffff", rx=8, ry=8, stroke="#d6e0ea"))
     dwg.add(dwg.text("Population Breakdown", insert=(mp_x + 12, mp_y + 22), font_size=HEADER_FS, fill="#0b3b4a"))
+    
+    # Total homeless count
+    dwg.add(dwg.text(f"Total Homeless: {s.homeless_population}", insert=(mp_x + 12, mp_y + 38), font_size=BODY_FS, fill="#0b3b4a", style="font-weight:bold"))
 
     # bars for subpopulations
     sub_x = mp_x + 16
@@ -118,13 +127,13 @@ def render_state(s, roles=None):
         dwg.add(dwg.text(f"{label}", insert=(sub_x, mp_y + y_offset + 2), font_size=SM_FS))
         dwg.add(dwg.text(f"{value}", insert=(sub_x + max_bar_w + 2, mp_y + y_offset + 2), font_size=SM_FS))
 
-    draw_sub(40, "Families", s.pop_families, "#7fb7ff")
-    draw_sub(80, "Youth", s.pop_youth, "#ffd366")
-    draw_sub(120, "Chronic", s.pop_chronic, "#ffa3a3")
-    draw_sub(160, "Veterans", s.pop_veterans, "#c1f0c1")
+    draw_sub(60, "Families", s.pop_families, "#7fb7ff")
+    draw_sub(100, "Youth", s.pop_youth, "#ffd366")
+    draw_sub(140, "Chronic", s.pop_chronic, "#ffa3a3")
+    draw_sub(180, "Veterans", s.pop_veterans, "#c1f0c1")
 
     # sparkline trend
-    dwg.add(dwg.text("Trend (last 10):", insert=(mp_x + 12, mp_y + 200), font_size=SM_FS))
+    dwg.add(dwg.text("Population Trend (last 10 moves):", insert=(mp_x + 12, mp_y + 200), font_size=SM_FS))
     _sparkline(dwg, mp_x + 20, mp_y + 208, mp_w - 40, 60, getattr(s, "trend_history", []), stroke="#0b3b4a")
 
     # -------- RIGHT PANEL: Capacity & Support gauges --------
@@ -173,7 +182,7 @@ def render_state(s, roles=None):
     bottom_w = GRAPHIC_W - 2*PADDING
     bottom_h = GRAPHIC_H - bottom_y - PADDING
     dwg.add(dwg.rect((bottom_x, bottom_y), (bottom_w, bottom_h), fill="#ffffff", rx=8, ry=8, stroke="#d6e0ea"))
-    dwg.add(dwg.text("Available Operators (Only shown for your role when using role-specific UI):",
+    dwg.add(dwg.text("Current Role's Available Operators:",
                      insert=(bottom_x + 12, bottom_y + 20), font_size=HEADER_FS, fill="#0b3b4a"))
 
     # Suggest some operators based on current role (for display; actual availability enforced server-side)
