@@ -330,11 +330,4 @@ City Without Walls reflects empirical realities of homelessness:
 
 The game’s complexity mirrors real policymaking: intertwined, uncertain, and politically constrained.
 
----
 
-If you'd like, I can also add:
-
-* Visual examples
-* A shorter “Quick Start Guide”
-* A printable PDF version
-* Per-role strategy cheat sheets
